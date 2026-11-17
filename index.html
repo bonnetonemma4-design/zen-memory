@@ -10,17 +10,24 @@
 <title>Zen Memory</title>
 <style>
   :root {
-    --bg1: #f6efe7; --bg2: #e3efe6;
+    --bg1: #f6efe7; --bg2: #e3efe6; --outer1: #d9cfc4; --outer2: #b9cdbf;
     --card: #ffffff; --ink: #3d3a36; --soft: #8a8178;
-    --accent: #7fa88b; --accent-dark: #5e8a6c; --gold: #e0b44c;
+    --accent: #7fa88b; --accent-dark: #5e8a6c; --gold: #e0b44c; --danger: #d9534f;
+    --locked: #ece6de; --locked-ink: #b8afa5; --found: #fff8e6; --light-shadow: #d8d0c6;
     --back1: #9cc3a8; --back2: #6f9f80;
+  }
+  /* Mode nuit */
+  body.night {
+    --bg1: #1d2726; --bg2: #142019; --outer1: #0c1211; --outer2: #1a2824;
+    --card: #2a3836; --ink: #eef3ef; --soft: #9fb1a8;
+    --locked: #323f3d; --locked-ink: #6f807a; --found: #3b3a2a; --light-shadow: #161f1e;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   button { touch-action: manipulation; user-select: none; -webkit-user-select: none; font-family: inherit; }
   body {
     margin: 0; min-height: 100vh; font-family: "Segoe UI", system-ui, sans-serif;
     color: var(--ink); background: linear-gradient(160deg, var(--bg1), var(--bg2));
-    display: flex; justify-content: center;
+    display: flex; justify-content: center; transition: background .3s, color .3s;
   }
   .app { width: 100%; max-width: 720px; padding: 20px 16px 40px; }
   h1 { text-align: center; font-size: 2.2rem; margin: 10px 0 2px; letter-spacing: 1px; }
@@ -31,6 +38,7 @@
 
   .stats { display: flex; justify-content: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
   .pill { background: var(--card); border-radius: 999px; padding: 8px 16px; box-shadow: 0 2px 8px rgba(0,0,0,.06); font-weight: 600; }
+  .pill.warn { background: var(--danger); color: #fff; }
 
   .btn {
     border: none; border-radius: 14px; padding: 12px 22px; font-size: 1rem; font-weight: 600;
@@ -38,47 +46,86 @@
     transition: transform .1s;
   }
   .btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--accent-dark); }
-  .btn.light { background: var(--card); color: var(--ink); box-shadow: 0 3px 0 #d8d0c6; }
+  .btn.light { background: var(--card); color: var(--ink); box-shadow: 0 3px 0 var(--light-shadow); }
+  .btn:disabled { opacity: .4; cursor: default; }
+  .icon-btn { min-width: 44px; padding: 8px 12px; }
   .row { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; margin: 16px 0; }
+  .toggles .btn { font-size: .9rem; padding: 8px 14px; }
 
   .levels { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
   .lvl {
-    aspect-ratio: 1; border-radius: 16px; background: var(--card); border: none; cursor: pointer;
+    position: relative; aspect-ratio: 1; border-radius: 16px; background: var(--card); border: none; cursor: pointer;
     font-size: 1.4rem; font-weight: 700; color: var(--ink); box-shadow: 0 3px 10px rgba(0,0,0,.07);
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
   }
   .lvl small { font-size: .75rem; letter-spacing: 1px; color: var(--gold); }
-  .lvl.locked { background: #ece6de; color: #b8afa5; cursor: not-allowed; }
+  .lvl .tag { position: absolute; top: 4px; right: 6px; font-size: .7rem; }
+  .lvl.locked { background: var(--locked); color: var(--locked-ink); cursor: not-allowed; }
 
   .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 8px; flex-wrap: wrap; }
+  #game .topbar { gap: 6px; flex-wrap: nowrap; }
+  #game .topbar .pill { padding: 6px 10px; font-size: .95rem; white-space: nowrap; }
+  #game .topbar .icon-btn { min-width: 40px; padding: 8px 10px; font-size: 1rem; }
   .board { display: grid; gap: 10px; margin: 0 auto; }
   .card {
     aspect-ratio: 3/4; perspective: 600px; cursor: pointer; border: none; background: none; padding: 0;
   }
   .inner { position: relative; width: 100%; height: 100%; transition: transform .45s; transform-style: preserve-3d; }
-  .card.open .inner, .card.found .inner { transform: rotateY(180deg); }
+  .card.open .inner, .card.found .inner, .card.hint .inner { transform: rotateY(180deg); }
   .face {
     position: absolute; inset: 0; border-radius: 14px; backface-visibility: hidden;
     display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 10px rgba(0,0,0,.08);
   }
-  .back { background: linear-gradient(135deg, var(--back1), var(--back2)); color: rgba(255,255,255,.7); font-size: 1.6rem; }
+  .back { background: linear-gradient(135deg, var(--back1), var(--back2)); color: rgba(255,255,255,.75); font-size: 1.6rem; }
   .front { background: var(--card); transform: rotateY(180deg); font-size: clamp(1.6rem, 6vw, 2.6rem); }
-  .card.found .front { background: #fff8e6; outline: 3px solid var(--gold); }
+  .card.found .front { background: var(--found); outline: 3px solid var(--gold); animation: glow .7s ease-out; }
+  .card.hint .front { outline: 3px dashed var(--gold); }
+  @keyframes glow { from { box-shadow: 0 0 0 0 rgba(224,180,76,.9); } to { box-shadow: 0 0 0 14px rgba(224,180,76,0); } }
 
-  .badges { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
-  .badge { background: var(--card); border-radius: 16px; padding: 16px; text-align: center; box-shadow: 0 3px 10px rgba(0,0,0,.06); }
-  .badge .ico { font-size: 2.6rem; }
+  .section h2 { font-size: 1.2rem; margin: 26px 0 10px; }
+  .badges { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
+  .badge { background: var(--card); border-radius: 16px; padding: 14px; text-align: center; box-shadow: 0 3px 10px rgba(0,0,0,.06); }
+  .badge .ico { font-size: 2.4rem; }
   .badge b { display: block; margin-top: 6px; }
   .badge span { color: var(--soft); font-size: .85rem; }
+  .badge .unlock { display: block; color: var(--accent); font-size: .78rem; margin-top: 4px; font-weight: 600; }
   .badge.locked .ico { filter: grayscale(1); opacity: .35; }
-  .badge.locked b { color: #b8afa5; }
+  .badge.locked b { color: var(--locked-ink); }
 
-  .overlay { position: fixed; inset: 0; background: rgba(60,55,50,.45); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 10; }
+  .themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
+  .theme {
+    border: none; border-radius: 16px; padding: 12px 6px; background: var(--card); color: var(--ink);
+    box-shadow: 0 3px 10px rgba(0,0,0,.06); cursor: pointer; text-align: center; font-size: .95rem;
+  }
+  .theme .ico { font-size: 2rem; display: block; }
+  .theme small { color: var(--soft); }
+  .theme.on { outline: 3px solid var(--accent); }
+  .theme.locked { opacity: .55; cursor: not-allowed; }
+
+  .statsgrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .stat { background: var(--card); border-radius: 14px; padding: 12px; text-align: center; box-shadow: 0 3px 10px rgba(0,0,0,.06); }
+  .stat b { display: block; font-size: 1.5rem; }
+  .stat span { color: var(--soft); font-size: .85rem; }
+  .link { background: none; border: none; color: var(--soft); text-decoration: underline; cursor: pointer; margin: 26px auto 0; display: block; font-size: .9rem; }
+
+  .overlay { position: fixed; inset: 0; background: rgba(30,28,25,.5); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 10; }
   .overlay.show { display: flex; }
-  .modal { background: var(--card); border-radius: 22px; padding: 26px; text-align: center; max-width: 380px; width: 100%; animation: pop .35s ease; }
+  .modal { background: var(--card); color: var(--ink); border-radius: 22px; padding: 24px; text-align: center; max-width: 380px; width: 100%; max-height: 88vh; overflow-y: auto; animation: pop .35s ease; }
   @keyframes pop { from { transform: scale(.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
   .bigstars { font-size: 2.6rem; letter-spacing: 6px; margin: 8px 0; }
-  .newbadge { margin-top: 12px; padding: 12px; border-radius: 14px; background: #fff8e6; }
+  .newbadge { margin-top: 12px; padding: 12px; border-radius: 14px; background: var(--found); }
+  .record { color: var(--gold); font-weight: 700; }
+  .float {
+    position: fixed; left: 50%; top: 22%; background: var(--card); color: var(--ink); padding: 10px 22px;
+    border-radius: 999px; font-weight: 700; font-size: 1.1rem; box-shadow: 0 6px 20px rgba(0,0,0,.18);
+    z-index: 15; pointer-events: none; white-space: nowrap; animation: floatUp 1.4s ease forwards;
+  }
+  @keyframes floatUp {
+    0% { opacity: 0; transform: translate(-50%, 10px) scale(.9); }
+    15% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+    80% { opacity: 1; transform: translate(-50%, -6px); }
+    100% { opacity: 0; transform: translate(-50%, -20px); }
+  }
   .confetti { position: fixed; top: -20px; font-size: 1.4rem; pointer-events: none; animation: fall linear forwards; z-index: 20; }
   @keyframes fall { to { transform: translateY(110vh) rotate(360deg); } }
 
@@ -99,7 +146,7 @@
     .lvl small { font-size: .75rem; }
     .btn { font-size: 1rem; padding: 12px 22px; }
     .pill { font-size: 1rem; }
-    body { align-items: center; padding: 24px; background: linear-gradient(160deg, #d9cfc4, #b9cdbf); }
+    body { align-items: center; padding: 24px; background: linear-gradient(160deg, var(--outer1), var(--outer2)); }
     .app {
       max-width: 400px; height: min(840px, calc(100vh - 48px)); overflow-y: auto;
       border: 12px solid #2f2f33; border-radius: 44px; padding-top: 34px;
@@ -124,22 +171,28 @@
     <h1>🌸 Zen Memory 🌸</h1>
     <p class="sub">Retrouve les paires, détends-toi et gagne des récompenses</p>
     <div class="stats">
-      <div class="pill">⭐ <span id="totalStars">0</span> étoiles</div>
+      <div class="pill">⭐ <span id="totalStars">0</span> / <span id="maxStars">45</span></div>
       <div class="pill">🏆 <span id="totalBadges">0</span> récompenses</div>
     </div>
     <div class="levels" id="levels"></div>
     <div class="row">
-      <button class="btn light" onclick="show('rewards')">🏆 Mes récompenses</button>
+      <button class="btn light" onclick="show('rewards')">🏆 Récompenses</button>
       <button class="btn light" onclick="showHelp()">❓ Comment jouer</button>
+    </div>
+    <div class="row toggles">
+      <button class="btn light" id="soundBtn" onclick="toggleSound()">🔊 Son : oui</button>
+      <button class="btn light" id="nightBtn" onclick="toggleNight()">🌙 Mode nuit</button>
     </div>
   </section>
 
   <!-- Écran de jeu -->
   <section id="game" class="screen">
     <div class="topbar">
-      <button class="btn light" onclick="goHome()">← Menu</button>
-      <div class="pill">Niveau <span id="lvlNum">1</span></div>
-      <div class="pill">Coups : <span id="moves">0</span></div>
+      <button class="btn light icon-btn" onclick="goHome()" aria-label="Retour au menu">←</button>
+      <div class="pill">Niv. <span id="lvlNum">1</span></div>
+      <div class="pill">🔄 <span id="moves">0</span></div>
+      <div class="pill" id="timePill">⏱ <span id="time">0:00</span></div>
+      <button class="btn light icon-btn" id="hintBtn" onclick="useHint()" aria-label="Indice">💡</button>
     </div>
     <div class="board" id="board"></div>
   </section>
@@ -151,8 +204,15 @@
       <div class="pill">⭐ <span id="totalStars2">0</span> étoiles</div>
     </div>
     <h1 style="font-size:1.8rem">🏆 Mes récompenses</h1>
-    <p class="sub">Gagne des étoiles pour débloquer de nouvelles récompenses</p>
-    <div class="badges" id="badges"></div>
+    <div class="section">
+      <h2>🎴 Thèmes de cartes</h2>
+      <p class="sub" style="text-align:left; margin:0 0 10px">Choisis les images de tes cartes</p>
+      <div class="themes" id="themes"></div>
+    </div>
+    <div class="section"><h2>🎁 Récompenses</h2><div class="badges" id="badges"></div></div>
+    <div class="section"><h2>✨ Succès</h2><div class="badges" id="succes"></div></div>
+    <div class="section"><h2>📊 Mes statistiques</h2><div class="statsgrid" id="statsgrid"></div></div>
+    <button class="link" onclick="askReset()">Recommencer à zéro</button>
   </section>
 </div>
 
@@ -161,50 +221,132 @@
 
 <script>
 // ---------- Réglages du jeu ----------
-const SYMBOLS = ["🌸","🕯️","🧴","🌿","🍵","💆‍♀️","🛁","🌺","🍃","🌙","🐚","🍋","🧖‍♀️","🌼"];
-// Nombre de paires pour chaque niveau
-const LEVELS = [3, 4, 5, 6, 6, 8, 8, 10, 10, 12];
+// Les thèmes de cartes (débloqués avec les étoiles)
+const THEMES = {
+  spa:      { name: "Spa",      ico: "🌸", stars: 0,  back: ["#9cc3a8", "#6f9f80"], mark: "✿",
+              cards: ["🌸","🕯️","🧴","🌿","🍵","💆‍♀️","🛁","🌺","🍃","🌙","🐚","🍋","🧖‍♀️","🌼"] },
+  fruits:   { name: "Fruits",   ico: "🍓", stars: 6,  back: ["#f4a7a0", "#e0766d"], mark: "❀",
+              cards: ["🍓","🍒","🍑","🍍","🥝","🍇","🍉","🍋","🍊","🍎","🍐","🥥","🍌","🍈"] },
+  animaux:  { name: "Animaux",  ico: "🐱", stars: 14, back: ["#e8c07a", "#c9954a"], mark: "🐾",
+              cards: ["🐱","🐶","🦊","🐼","🐨","🐰","🦁","🐯","🐸","🐵","🐧","🦄","🐢","🦋"] },
+  ocean:    { name: "Océan",    ico: "🐠", stars: 22, back: ["#8cc4e0", "#4f8fb8"], mark: "≈",
+              cards: ["🐠","🐟","🐬","🐳","🐙","🦀","🐚","🦑","🐡","🦈","🌊","⚓","🐋","🦞"] },
+  douceurs: { name: "Douceurs", ico: "🧁", stars: 30, back: ["#d9a7d9", "#a974b5"], mark: "♥",
+              cards: ["🍰","🧁","🍩","🍪","🍫","🍬","🍭","🍦","🥐","🍮","🎂","🍯","🥞","🍡"] },
+};
+
+// Les niveaux : nombre de paires, aperçu au début (en millisecondes), temps limite (en secondes)
+const LEVELS = [
+  { pairs: 3,  preview: 2500 },
+  { pairs: 4,  preview: 2500 },
+  { pairs: 5,  preview: 2000 },
+  { pairs: 6,  preview: 2000 },
+  { pairs: 6,  preview: 1500 },
+  { pairs: 8,  preview: 1500 },
+  { pairs: 8,  preview: 1000 },
+  { pairs: 10, preview: 1000 },
+  { pairs: 10 },
+  { pairs: 12 },
+  { pairs: 8,  time: 50 },   // défis chrono
+  { pairs: 10, time: 65 },
+  { pairs: 10, time: 55 },
+  { pairs: 12, time: 80 },
+  { pairs: 12, time: 70 },
+];
+const MAX_STARS = LEVELS.length * 3;
+
 // Récompenses : nombre d'étoiles à atteindre
 const REWARDS = [
   { stars: 3,  ico: "🌸", name: "Fleur de lotus" },
-  { stars: 6,  ico: "🕯️", name: "Bougie parfumée" },
+  { stars: 6,  ico: "🍓", name: "Panier de fruits", theme: "fruits" },
   { stars: 10, ico: "🍵", name: "Thé détente" },
-  { stars: 14, ico: "🧴", name: "Huile de massage" },
+  { stars: 14, ico: "🐱", name: "Ami des animaux", theme: "animaux" },
   { stars: 18, ico: "🛁", name: "Bain moussant" },
-  { stars: 22, ico: "💆‍♀️", name: "Massage royal" },
-  { stars: 26, ico: "🌿", name: "Maître zen" },
-  { stars: 30, ico: "👑", name: "Reine du spa" },
+  { stars: 22, ico: "🐠", name: "Perle de l'océan", theme: "ocean" },
+  { stars: 26, ico: "💆‍♀️", name: "Massage royal" },
+  { stars: 30, ico: "🧁", name: "Gourmandise", theme: "douceurs" },
+  { stars: 38, ico: "👑", name: "Reine du spa" },
+  { stars: 45, ico: "💎", name: "Légende zen" },
 ];
 
+// Succès : des défis spéciaux
+const SUCCES = [
+  { id: "parfait", ico: "🎯", name: "Sans faute",       desc: "Finir un niveau sans aucune erreur" },
+  { id: "combo",   ico: "🔥", name: "En feu",           desc: "Trouver 5 paires de suite" },
+  { id: "eclair",  ico: "⚡", name: "Éclair",           desc: "Finir un niveau de 8 paires ou plus en moins de 40 s" },
+  { id: "chrono",  ico: "⏱️", name: "Contre la montre", desc: "Gagner un défi chrono" },
+  { id: "sage",    ico: "🧘", name: "Mémoire zen",      desc: "3 étoiles sur un niveau sans aperçu ni indice" },
+  { id: "fidele",  ico: "💖", name: "Fidèle",           desc: "Gagner 25 parties" },
+];
+
+const COMBO_MSG = ["", "", "Bien joué ! ✨", "Combo x3 ! 🔥", "Combo x4 ! 🔥🔥", "Incroyable ! x5 🌟"];
+
 // ---------- Sauvegarde (reste dans le navigateur) ----------
-let save = { stars: {} }; // stars[niveau] = meilleur score (1 à 3)
-try { const s = JSON.parse(localStorage.getItem("zenMemory")); if (s && s.stars) save = s; } catch (e) {}
+const DEFAULT_SAVE = () => ({ stars: {}, best: {}, succes: {}, wins: 0, pairs: 0, theme: "spa", sound: true, night: null });
+let save = DEFAULT_SAVE();
+try {
+  const s = JSON.parse(localStorage.getItem("zenMemory"));
+  if (s && s.stars) save = Object.assign(DEFAULT_SAVE(), s);
+} catch (e) {}
+if (save.night === null) {
+  try { save.night = matchMedia("(prefers-color-scheme: dark)").matches; } catch (e) { save.night = false; }
+}
 function store() { try { localStorage.setItem("zenMemory", JSON.stringify(save)); } catch (e) {} }
 
+const $ = id => document.getElementById(id);
 const totalStars = () => Object.values(save.stars).reduce((a, b) => a + b, 0);
 const unlockedBadges = (n = totalStars()) => REWARDS.filter(r => n >= r.stars);
 const isUnlocked = i => i === 0 || save.stars[i - 1] > 0;
+const fmt = s => Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padStart(2, "0");
+const currentTheme = () => THEMES[save.theme] && totalStars() >= THEMES[save.theme].stars ? THEMES[save.theme] : THEMES.spa;
+
+// ---------- Sons (créés par le navigateur, pas de fichier à télécharger) ----------
+let audio = null;
+function tone(freq, dur = 0.25, type = "sine", vol = 0.08, delay = 0) {
+  if (!save.sound) return;
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    const t = audio.currentTime + delay;
+    const o = audio.createOscillator(), g = audio.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(audio.destination);
+    o.start(t); o.stop(t + dur + 0.05);
+  } catch (e) {}
+}
+const NOTES = [523, 659, 784, 988, 1175];
+const SFX = {
+  flip:  () => tone(660, 0.08, "triangle", 0.03),
+  match: c => { const f = NOTES[Math.min(c, 5) - 1]; tone(f, 0.4, "sine", 0.09); tone(f * 1.5, 0.3, "sine", 0.04, 0.06); },
+  miss:  () => tone(220, 0.2, "sine", 0.04),
+  hint:  () => { tone(880, 0.2, "sine", 0.05); tone(1320, 0.2, "sine", 0.03, 0.1); },
+  win:   () => [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.5, "sine", 0.08, i * 0.12)),
+  lose:  () => [392, 330, 262].forEach((f, i) => tone(f, 0.4, "sine", 0.06, i * 0.15)),
+};
 
 // ---------- Navigation ----------
 function show(id) {
   document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
-  document.getElementById(id).classList.add("active");
+  $(id).classList.add("active");
   if (id === "home") renderHome();
   if (id === "rewards") renderRewards();
 }
-function goHome() { closeModal(); show("home"); }
+function goHome() { stopGame(); closeModal(); show("home"); }
 
 function renderHome() {
-  document.getElementById("totalStars").textContent = totalStars();
-  document.getElementById("totalBadges").textContent = unlockedBadges().length;
-  const box = document.getElementById("levels");
+  $("totalStars").textContent = totalStars();
+  $("maxStars").textContent = MAX_STARS;
+  $("totalBadges").textContent = unlockedBadges().length;
+  const box = $("levels");
   box.innerHTML = "";
-  LEVELS.forEach((_, i) => {
+  LEVELS.forEach((cfg, i) => {
     const b = document.createElement("button");
     const st = save.stars[i] || 0;
     if (isUnlocked(i)) {
       b.className = "lvl";
-      b.innerHTML = `${i + 1}<small>${"★".repeat(st)}${"☆".repeat(3 - st)}</small>`;
+      b.innerHTML = `${cfg.time ? '<span class="tag">⏱</span>' : ""}${i + 1}<small>${"★".repeat(st)}${"☆".repeat(3 - st)}</small>`;
       b.onclick = () => startLevel(i);
     } else {
       b.className = "lvl locked";
@@ -212,88 +354,252 @@ function renderHome() {
     }
     box.appendChild(b);
   });
+  updateToggles();
 }
+
+function updateToggles() {
+  $("soundBtn").textContent = save.sound ? "🔊 Son : oui" : "🔇 Son : non";
+  $("nightBtn").textContent = save.night ? "☀️ Mode jour" : "🌙 Mode nuit";
+}
+function toggleSound() { save.sound = !save.sound; store(); updateToggles(); SFX.match(1); }
+function toggleNight() { save.night = !save.night; applyNight(); store(); updateToggles(); }
+function applyNight() { document.body.classList.toggle("night", !!save.night); }
 
 function renderRewards() {
   const n = totalStars();
-  document.getElementById("totalStars2").textContent = n;
-  document.getElementById("badges").innerHTML = REWARDS.map(r => `
+  $("totalStars2").textContent = n;
+  $("themes").innerHTML = Object.entries(THEMES).map(([k, t]) => {
+    const ok = n >= t.stars, on = currentTheme() === t;
+    return `<button class="theme ${on ? "on" : ""} ${ok ? "" : "locked"}" ${ok ? `onclick="pickTheme('${k}')"` : ""}>
+      <span class="ico">${ok ? t.ico : "🔒"}</span><b>${t.name}</b><br>
+      <small>${ok ? (on ? "Choisi ✓" : "Choisir") : t.stars + " ⭐"}</small></button>`;
+  }).join("");
+  $("badges").innerHTML = REWARDS.map(r => `
     <div class="badge ${n >= r.stars ? "" : "locked"}">
       <div class="ico">${r.ico}</div>
       <b>${r.name}</b>
       <span>${n >= r.stars ? "Débloquée !" : r.stars + " ⭐ nécessaires"}</span>
+      ${r.theme ? `<span class="unlock">Débloque le thème ${THEMES[r.theme].name}</span>` : ""}
     </div>`).join("");
+  $("succes").innerHTML = SUCCES.map(s => `
+    <div class="badge ${save.succes[s.id] ? "" : "locked"}">
+      <div class="ico">${s.ico}</div>
+      <b>${s.name}</b>
+      <span>${s.desc}</span>
+    </div>`).join("");
+  const nbSucces = SUCCES.filter(s => save.succes[s.id]).length;
+  $("statsgrid").innerHTML = [
+    [save.wins, "parties gagnées"], [save.pairs, "paires trouvées"],
+    [n + " / " + MAX_STARS, "étoiles"], [nbSucces + " / " + SUCCES.length, "succès"],
+  ].map(([v, l]) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`).join("");
+}
+function pickTheme(k) { save.theme = k; store(); SFX.flip(); renderRewards(); }
+
+function askReset() {
+  openModal(`<h2>Tout effacer ? 🗑️</h2>
+    <p>Tes étoiles, tes récompenses et tes records seront supprimés.</p>
+    <div class="row">
+      <button class="btn light" onclick="closeModal()">Annuler</button>
+      <button class="btn" style="background:var(--danger); box-shadow:0 3px 0 #a94442" onclick="doReset()">Oui, tout effacer</button>
+    </div>`);
+}
+function doReset() {
+  const keep = { sound: save.sound, night: save.night };
+  save = Object.assign(DEFAULT_SAVE(), keep);
+  store(); closeModal(); show("home");
 }
 
 // ---------- Partie ----------
-let level = 0, first = null, lock = false, moves = 0, found = 0;
+let G = null, gameSeq = 0;
 
 function startLevel(i) {
-  level = i; first = null; lock = false; moves = 0; found = 0;
-  const pairs = LEVELS[i];
-  const picks = shuffle([...SYMBOLS]).slice(0, pairs);
+  stopGame(); closeModal();
+  const cfg = LEVELS[i], th = currentTheme();
+  G = { level: i, cfg, first: null, lock: true, moves: 0, found: 0, combo: 0, maxCombo: 0, misses: 0,
+        hintUsed: false, start: 0, elapsed: 0, timer: null, id: ++gameSeq, over: false };
+  const picks = shuffle([...th.cards]).slice(0, cfg.pairs);
   const deck = shuffle([...picks, ...picks]);
   let cols = deck.length <= 6 ? 3 : deck.length <= 16 ? 4 : deck.length <= 20 ? 5 : 6;
   const tablette = window.innerWidth >= 600 && !matchMedia("(hover: hover) and (pointer: fine)").matches;
   if (!tablette) cols = Math.min(cols, 4); // format téléphone : cartes plus grandes
-  const board = document.getElementById("board");
+  const board = $("board");
   board.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
   board.style.maxWidth = cols * (tablette ? 140 : 110) + "px"; // cartes plus grandes sur tablette
+  board.style.setProperty("--back1", th.back[0]);
+  board.style.setProperty("--back2", th.back[1]);
   board.innerHTML = "";
   deck.forEach(sym => {
     const c = document.createElement("button");
     c.className = "card";
     c.dataset.sym = sym;
-    c.innerHTML = `<div class="inner"><div class="face back">✿</div><div class="face front">${sym}</div></div>`;
+    c.innerHTML = `<div class="inner"><div class="face back">${th.mark}</div><div class="face front">${sym}</div></div>`;
     c.onclick = () => flip(c);
     board.appendChild(c);
   });
-  document.getElementById("lvlNum").textContent = i + 1;
-  document.getElementById("moves").textContent = 0;
+  $("lvlNum").textContent = i + 1;
+  $("moves").textContent = 0;
+  $("time").textContent = cfg.time ? fmt(cfg.time) : "0:00";
+  $("timePill").classList.remove("warn");
+  $("hintBtn").disabled = false;
   show("game");
-}
 
-function flip(c) {
-  if (lock || c === first || c.classList.contains("found")) return;
-  c.classList.add("open");
-  if (!first) { first = c; return; }
-  moves++;
-  document.getElementById("moves").textContent = moves;
-  const second = c;
-  if (first.dataset.sym === second.dataset.sym) {
-    first.classList.add("found"); second.classList.add("found");
-    first = null; found++;
-    try { navigator.vibrate && navigator.vibrate(40); } catch (e) {} // petite vibration sur téléphone
-    if (found === LEVELS[level]) setTimeout(win, 600);
+  const id = G.id, alive = () => G && G.id === id;
+  if (cfg.time) floatMsg(`Défi chrono : ${cfg.time} secondes ! ⏱`);
+  if (cfg.preview) {
+    setTimeout(() => {
+      if (!alive()) return;
+      const cards = board.querySelectorAll(".card");
+      cards.forEach(c => c.classList.add("open"));
+      floatMsg("Mémorise ! 👀");
+      setTimeout(() => {
+        if (!alive()) return;
+        cards.forEach(c => c.classList.remove("open"));
+        setTimeout(() => { if (alive()) beginPlay(); }, 450);
+      }, cfg.preview);
+    }, 400);
   } else {
-    lock = true;
-    setTimeout(() => { first.classList.remove("open"); second.classList.remove("open"); first = null; lock = false; }, 800);
+    beginPlay();
   }
 }
 
-function win() {
-  const pairs = LEVELS[level];
-  const stars = moves <= Math.ceil(pairs * 1.5) ? 3 : moves <= pairs * 2.2 ? 2 : 1;
-  const before = unlockedBadges().length;
-  save.stars[level] = Math.max(save.stars[level] || 0, stars);
-  store();
-  const newOnes = unlockedBadges().slice(before);
-  const last = level === LEVELS.length - 1;
+function beginPlay() {
+  G.lock = false;
+  G.start = Date.now();
+  G.timer = setInterval(tick, 250);
+  tick();
+}
 
+function tick() {
+  if (!G || G.over) return;
+  G.elapsed = (Date.now() - G.start) / 1000;
+  if (G.cfg.time) {
+    const left = Math.max(0, G.cfg.time - G.elapsed);
+    $("time").textContent = fmt(Math.ceil(left));
+    $("timePill").classList.toggle("warn", left <= 10);
+    if (left <= 0) lose();
+  } else {
+    $("time").textContent = fmt(G.elapsed);
+  }
+}
+
+function stopGame() {
+  if (G) { G.over = true; clearInterval(G.timer); }
+  G = null;
+}
+
+function flip(c) {
+  if (!G || G.lock || G.over || c === G.first || c.classList.contains("found") || c.classList.contains("open")) return;
+  c.classList.add("open");
+  SFX.flip();
+  if (!G.first) { G.first = c; return; }
+  G.moves++;
+  $("moves").textContent = G.moves;
+  const a = G.first, b = c;
+  G.first = null;
+  if (a.dataset.sym === b.dataset.sym) {
+    a.classList.add("found"); b.classList.add("found");
+    G.found++; G.combo++; G.maxCombo = Math.max(G.maxCombo, G.combo);
+    save.pairs++;
+    SFX.match(G.combo);
+    try { navigator.vibrate && navigator.vibrate(40); } catch (e) {} // petite vibration sur téléphone
+    if (G.combo >= 2) floatMsg(COMBO_MSG[G.combo] || `Combo x${G.combo} ! 🌟`);
+    if (G.found === G.cfg.pairs) {
+      G.over = true;
+      clearInterval(G.timer);
+      G.elapsed = (Date.now() - G.start) / 1000;
+      setTimeout(win, 600);
+    }
+  } else {
+    G.combo = 0; G.misses++; G.lock = true;
+    SFX.miss();
+    const id = G.id;
+    setTimeout(() => {
+      a.classList.remove("open"); b.classList.remove("open");
+      if (G && G.id === id) G.lock = false;
+    }, 800);
+  }
+}
+
+function useHint() {
+  if (!G || G.lock || G.over || G.hintUsed) return;
+  const hidden = [...$("board").querySelectorAll(".card")].filter(c => !c.classList.contains("found") && !c.classList.contains("open"));
+  const groups = {};
+  hidden.forEach(c => (groups[c.dataset.sym] = groups[c.dataset.sym] || []).push(c));
+  const pairs = Object.values(groups).filter(g => g.length === 2);
+  if (!pairs.length) return;
+  const pair = pairs[Math.floor(Math.random() * pairs.length)];
+  G.hintUsed = true; G.lock = true;
+  $("hintBtn").disabled = true;
+  pair.forEach(c => c.classList.add("hint"));
+  SFX.hint();
+  floatMsg("Indice : 2 ⭐ maximum 💡");
+  const id = G.id;
+  setTimeout(() => {
+    pair.forEach(c => c.classList.remove("hint"));
+    if (G && G.id === id) G.lock = false;
+  }, 1000);
+}
+
+function win() {
+  if (!G) return;
+  const i = G.level, cfg = G.cfg, moves = G.moves, t = G.elapsed;
+  let stars = moves <= Math.ceil(cfg.pairs * 1.5) ? 3 : moves <= cfg.pairs * 2.2 ? 2 : 1;
+  if (G.hintUsed) stars = Math.min(stars, 2);
+  const badgesBefore = unlockedBadges().length;
+  save.stars[i] = Math.max(save.stars[i] || 0, stars);
+  save.wins++;
+  const old = save.best[i];
+  const record = !old || moves < old.m || (moves === old.m && Math.round(t) < old.t);
+  if (record) save.best[i] = { m: moves, t: Math.round(t) };
+
+  const got = [];
+  const unlock = id => { if (!save.succes[id]) { save.succes[id] = true; got.push(SUCCES.find(s => s.id === id)); } };
+  if (G.misses === 0) unlock("parfait");
+  if (G.maxCombo >= 5) unlock("combo");
+  if (cfg.pairs >= 8 && t < 40) unlock("eclair");
+  if (cfg.time) unlock("chrono");
+  if (!cfg.preview && !G.hintUsed && stars === 3) unlock("sage");
+  if (save.wins >= 25) unlock("fidele");
+  store();
+
+  const newBadges = unlockedBadges().slice(badgesBefore);
+  const last = i === LEVELS.length - 1;
   let html = `<h2>Bravo ! 🎉</h2>
-    <p>Niveau ${level + 1} terminé en ${moves} coups</p>
+    <p>Niveau ${i + 1} · ${moves} coups · ${fmt(t)}</p>
     <div class="bigstars">${"⭐".repeat(stars)}${"☆".repeat(3 - stars)}</div>`;
-  newOnes.forEach(r => {
-    html += `<div class="newbadge">Nouvelle récompense !<br><span style="font-size:2.2rem">${r.ico}</span><br><b>${r.name}</b></div>`;
+  if (record && old) html += `<p class="record">🏅 Nouveau record !</p>`;
+  else if (old) html += `<p style="color:var(--soft)">Record : ${old.m} coups · ${fmt(old.t)}</p>`;
+  if (G.hintUsed && stars === 2) html += `<p style="color:var(--soft)">Rejoue sans indice pour gagner 3 étoiles 😉</p>`;
+  newBadges.forEach(r => {
+    html += `<div class="newbadge">Nouvelle récompense !<br><span style="font-size:2.2rem">${r.ico}</span><br><b>${r.name}</b>
+      ${r.theme ? `<br>🎴 Nouveau thème de cartes : <b>${THEMES[r.theme].name}</b>` : ""}</div>`;
+  });
+  got.forEach(s => {
+    html += `<div class="newbadge">Succès débloqué !<br><span style="font-size:2.2rem">${s.ico}</span><br><b>${s.name}</b></div>`;
   });
   if (last) html += `<p>Tu as fini tous les niveaux ! Essaie d'avoir 3 étoiles partout 😉</p>`;
   html += `<div class="row">
-      <button class="btn light" onclick="closeModal(); startLevel(${level})">↻ Rejouer</button>
+      <button class="btn light" onclick="startLevel(${i})">↻ Rejouer</button>
       ${last ? `<button class="btn" onclick="goHome()">Menu</button>`
-             : `<button class="btn" onclick="closeModal(); startLevel(${level + 1})">Niveau suivant →</button>`}
+             : `<button class="btn" onclick="startLevel(${i + 1})">Niveau suivant →</button>`}
     </div>`;
+  G = null;
   openModal(html);
+  SFX.win();
   confetti();
+}
+
+function lose() {
+  if (!G) return;
+  const i = G.level, found = G.found, total = G.cfg.pairs;
+  G.over = true; clearInterval(G.timer); G.lock = true;
+  SFX.lose();
+  openModal(`<h2>Temps écoulé ⏱</h2>
+    <p>Tu as trouvé ${found} paire${found > 1 ? "s" : ""} sur ${total}.<br>Essaie encore, tu vas y arriver ! 💪</p>
+    <div class="row">
+      <button class="btn light" onclick="goHome()">Menu</button>
+      <button class="btn" onclick="startLevel(${i})">↻ Réessayer</button>
+    </div>`);
 }
 
 function showHelp() {
@@ -302,17 +608,28 @@ function showHelp() {
     2. Clique sur une 2e carte.<br>
     3. Si les deux images sont pareilles, tu gagnes la paire !<br>
     4. Trouve toutes les paires pour finir le niveau.<br><br>
-    Moins tu fais de coups, plus tu gagnes d'étoiles ⭐.<br>
-    Les étoiles débloquent des récompenses 🏆 et les niveaux suivants.</p>
+    👀 Au début des premiers niveaux, les cartes se montrent quelques secondes : mémorise-les !<br><br>
+    ⭐ Moins tu fais de coups, plus tu gagnes d'étoiles.<br>
+    💡 Le bouton indice montre une paire (1 fois par niveau), mais tu gagnes 2 étoiles maximum.<br>
+    ⏱ Les niveaux 11 à 15 sont des défis chrono : trouve tout avant la fin du temps !<br><br>
+    🎴 Les étoiles débloquent de nouveaux thèmes de cartes, des récompenses 🏆 et les niveaux suivants.</p>
     <div class="row"><button class="btn" onclick="closeModal()">C'est parti !</button></div>`);
 }
 
 // ---------- Petits outils ----------
-function openModal(html) { document.getElementById("modal").innerHTML = html; document.getElementById("overlay").classList.add("show"); }
-function closeModal() { document.getElementById("overlay").classList.remove("show"); }
+function openModal(html) { $("modal").innerHTML = html; $("overlay").classList.add("show"); }
+function closeModal() { $("overlay").classList.remove("show"); }
 function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function floatMsg(text) {
+  document.querySelectorAll(".float").forEach(f => f.remove());
+  const d = document.createElement("div");
+  d.className = "float";
+  d.textContent = text;
+  document.body.appendChild(d);
+  setTimeout(() => d.remove(), 1400);
+}
 function confetti() {
-  const bits = ["🌸","⭐","🌿","✨","🌼"];
+  const bits = [...currentTheme().cards.slice(0, 4), "⭐", "✨"];
   for (let i = 0; i < 30; i++) {
     const s = document.createElement("div");
     s.className = "confetti";
@@ -325,6 +642,7 @@ function confetti() {
   }
 }
 
+applyNight();
 renderHome();
 </script>
 </body>
