@@ -30,6 +30,7 @@
     display: flex; justify-content: center; transition: background .3s, color .3s;
   }
   .app { width: 100%; max-width: 720px; padding: 20px 16px 40px; }
+  body.playing .app { padding-bottom: 16px; }
   h1 { text-align: center; font-size: 2.2rem; margin: 10px 0 2px; letter-spacing: 1px; }
   .sub { text-align: center; color: var(--soft); margin: 0 0 20px; }
   .screen { display: none; }
@@ -68,7 +69,7 @@
   #game .topbar .icon-btn { min-width: 40px; padding: 8px 10px; font-size: 1rem; }
   .board { display: grid; gap: 10px; margin: 0 auto; }
   .card {
-    aspect-ratio: 3/4; perspective: 600px; cursor: pointer; border: none; background: none; padding: 0;
+    width: 100%; height: 100%; perspective: 600px; cursor: pointer; border: none; background: none; padding: 0;
   }
   .inner { position: relative; width: 100%; height: 100%; transition: transform .45s; transform-style: preserve-3d; }
   .card.open .inner, .card.found .inner, .card.hint .inner { transform: rotateY(180deg); }
@@ -76,8 +77,8 @@
     position: absolute; inset: 0; border-radius: 14px; backface-visibility: hidden;
     display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 10px rgba(0,0,0,.08);
   }
-  .back { background: linear-gradient(135deg, var(--back1), var(--back2)); color: rgba(255,255,255,.75); font-size: 1.6rem; }
-  .front { background: var(--card); transform: rotateY(180deg); font-size: clamp(1.6rem, 6vw, 2.6rem); }
+  .back { background: linear-gradient(135deg, var(--back1), var(--back2)); color: rgba(255,255,255,.75); font-size: calc(var(--cw, 80px) * .32); }
+  .front { background: var(--card); transform: rotateY(180deg); font-size: calc(var(--cw, 80px) * .5); }
   .card.found .front { background: var(--found); outline: 3px solid var(--gold); animation: glow .7s ease-out; }
   .card.hint .front { outline: 3px dashed var(--gold); }
   @keyframes glow { from { box-shadow: 0 0 0 0 rgba(224,180,76,.9); } to { box-shadow: 0 0 0 14px rgba(224,180,76,0); } }
@@ -330,6 +331,7 @@ const SFX = {
 function show(id) {
   document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
   $(id).classList.add("active");
+  document.body.classList.toggle("playing", id === "game");
   if (id === "home") renderHome();
   if (id === "rewards") renderRewards();
 }
@@ -419,12 +421,7 @@ function startLevel(i) {
         hintUsed: false, start: 0, elapsed: 0, timer: null, id: ++gameSeq, over: false };
   const picks = shuffle([...th.cards]).slice(0, cfg.pairs);
   const deck = shuffle([...picks, ...picks]);
-  let cols = deck.length <= 6 ? 3 : deck.length <= 16 ? 4 : deck.length <= 20 ? 5 : 6;
-  const tablette = window.innerWidth >= 600 && !matchMedia("(hover: hover) and (pointer: fine)").matches;
-  if (!tablette) cols = Math.min(cols, 4); // format téléphone : cartes plus grandes
   const board = $("board");
-  board.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-  board.style.maxWidth = cols * (tablette ? 140 : 110) + "px"; // cartes plus grandes sur tablette
   board.style.setProperty("--back1", th.back[0]);
   board.style.setProperty("--back2", th.back[1]);
   board.innerHTML = "";
@@ -442,6 +439,7 @@ function startLevel(i) {
   $("timePill").classList.remove("warn");
   $("hintBtn").disabled = false;
   show("game");
+  layoutBoard();
 
   const id = G.id, alive = () => G && G.id === id;
   if (cfg.time) floatMsg(`Défi chrono : ${cfg.time} secondes ! ⏱`);
@@ -461,6 +459,37 @@ function startLevel(i) {
     beginPlay();
   }
 }
+
+// Les cartes remplissent tout l'écran, sans trou : on essaie chaque nombre de colonnes
+// qui tombe juste (toutes les lignes pleines), on garde celui qui donne les plus belles cartes,
+// puis on les étire pour remplir toute la largeur et toute la hauteur.
+function layoutBoard() {
+  const board = $("board"), n = board.children.length;
+  if (!n) return;
+  const gap = 10;
+  const app = document.querySelector(".app");
+  app.scrollTop = 0; window.scrollTo(0, 0);
+  const st = getComputedStyle(app);
+  const framed = st.overflowY === "auto"; // le cadre "téléphone" sur ordinateur
+  const W = board.parentElement.clientWidth;
+  const top = board.getBoundingClientRect().top;
+  const bottom = framed ? app.getBoundingClientRect().bottom - parseFloat(st.borderBottomWidth) : window.innerHeight;
+  const H = Math.max(150, bottom - top - parseFloat(st.paddingBottom));
+  let best = { cw: 0, cols: 2 };
+  for (let cols = 2; cols <= n; cols++) {
+    if (n % cols) continue; // pas de trou : la dernière ligne doit être pleine
+    const rows = n / cols;
+    const cw = Math.min((W - gap * (cols - 1)) / cols, ((H - gap * (rows - 1)) / rows) * 3 / 4);
+    if (cw > best.cw) best = { cw, cols };
+  }
+  const cols = best.cols, rows = n / cols;
+  const ch = Math.floor((H - gap * (rows - 1)) / rows);
+  board.style.width = "100%";
+  board.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  board.style.gridTemplateRows = `repeat(${rows}, ${ch}px)`;
+  board.style.setProperty("--cw", Math.floor(best.cw) + "px"); // taille des images
+}
+window.addEventListener("resize", () => { if ($("game").classList.contains("active")) layoutBoard(); });
 
 function beginPlay() {
   G.lock = false;
