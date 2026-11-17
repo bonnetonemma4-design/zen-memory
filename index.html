@@ -84,8 +84,21 @@
 
   @media (max-width: 480px) { .levels { grid-template-columns: repeat(4, 1fr); } h1 { font-size: 1.8rem; } }
 
-  /* Sur un ordinateur : le jeu s'affiche dans un "téléphone" */
+  /* Sur une tablette : grand écran, grandes cartes */
   @media (min-width: 600px) {
+    .app { padding-top: 32px; }
+    .lvl { font-size: 1.8rem; }
+    .lvl small { font-size: 1rem; }
+    .btn { font-size: 1.15rem; padding: 14px 26px; }
+    .pill { font-size: 1.1rem; }
+  }
+
+  /* Sur un ordinateur (avec une souris) : le jeu s'affiche dans un "téléphone" */
+  @media (min-width: 600px) and (hover: hover) and (pointer: fine) {
+    .lvl { font-size: 1.4rem; }
+    .lvl small { font-size: .75rem; }
+    .btn { font-size: 1rem; padding: 12px 22px; }
+    .pill { font-size: 1rem; }
     body { align-items: center; padding: 24px; background: linear-gradient(160deg, #d9cfc4, #b9cdbf); }
     .app {
       max-width: 400px; height: min(840px, calc(100vh - 48px)); overflow-y: auto;
@@ -221,10 +234,11 @@ function startLevel(i) {
   const picks = shuffle([...SYMBOLS]).slice(0, pairs);
   const deck = shuffle([...picks, ...picks]);
   let cols = deck.length <= 6 ? 3 : deck.length <= 16 ? 4 : deck.length <= 20 ? 5 : 6;
-  cols = Math.min(cols, 4); // format téléphone : cartes plus grandes
+  const tablette = window.innerWidth >= 600 && !matchMedia("(hover: hover) and (pointer: fine)").matches;
+  if (!tablette) cols = Math.min(cols, 4); // format téléphone : cartes plus grandes
   const board = document.getElementById("board");
   board.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-  board.style.maxWidth = cols * 110 + "px";
+  board.style.maxWidth = cols * (tablette ? 140 : 110) + "px"; // cartes plus grandes sur tablette
   board.innerHTML = "";
   deck.forEach(sym => {
     const c = document.createElement("button");
