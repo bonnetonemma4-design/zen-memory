@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#7fa88b">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Zen Memory">
+<title>Zen Memory</title>
+<style>
+  :root {
+    --bg1: #f6efe7; --bg2: #e3efe6;
+    --card: #ffffff; --ink: #3d3a36; --soft: #8a8178;
+    --accent: #7fa88b; --accent-dark: #5e8a6c; --gold: #e0b44c;
+    --back1: #9cc3a8; --back2: #6f9f80;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  button { touch-action: manipulation; user-select: none; -webkit-user-select: none; font-family: inherit; }
+  body {
+    margin: 0; min-height: 100vh; font-family: "Segoe UI", system-ui, sans-serif;
+    color: var(--ink); background: linear-gradient(160deg, var(--bg1), var(--bg2));
+    display: flex; justify-content: center;
+  }
+  .app { width: 100%; max-width: 720px; padding: 20px 16px 40px; }
+  h1 { text-align: center; font-size: 2.2rem; margin: 10px 0 2px; letter-spacing: 1px; }
+  .sub { text-align: center; color: var(--soft); margin: 0 0 20px; }
+  .screen { display: none; }
+  .screen.active { display: block; animation: fade .3s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; } }
+
+  .stats { display: flex; justify-content: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+  .pill { background: var(--card); border-radius: 999px; padding: 8px 16px; box-shadow: 0 2px 8px rgba(0,0,0,.06); font-weight: 600; }
+
+  .btn {
+    border: none; border-radius: 14px; padding: 12px 22px; font-size: 1rem; font-weight: 600;
+    background: var(--accent); color: #fff; cursor: pointer; box-shadow: 0 3px 0 var(--accent-dark);
+    transition: transform .1s;
+  }
+  .btn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--accent-dark); }
+  .btn.light { background: var(--card); color: var(--ink); box-shadow: 0 3px 0 #d8d0c6; }
+  .row { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; margin: 16px 0; }
+
+  .levels { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+  .lvl {
+    aspect-ratio: 1; border-radius: 16px; background: var(--card); border: none; cursor: pointer;
+    font-size: 1.4rem; font-weight: 700; color: var(--ink); box-shadow: 0 3px 10px rgba(0,0,0,.07);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  }
+  .lvl small { font-size: .75rem; letter-spacing: 1px; color: var(--gold); }
+  .lvl.locked { background: #ece6de; color: #b8afa5; cursor: not-allowed; }
+
+  .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 8px; flex-wrap: wrap; }
+  .board { display: grid; gap: 10px; margin: 0 auto; }
+  .card {
+    aspect-ratio: 3/4; perspective: 600px; cursor: pointer; border: none; background: none; padding: 0;
+  }
+  .inner { position: relative; width: 100%; height: 100%; transition: transform .45s; transform-style: preserve-3d; }
+  .card.open .inner, .card.found .inner { transform: rotateY(180deg); }
+  .face {
+    position: absolute; inset: 0; border-radius: 14px; backface-visibility: hidden;
+    display: flex; align-items: center; justify-content: center; box-shadow: 0 3px 10px rgba(0,0,0,.08);
+  }
+  .back { background: linear-gradient(135deg, var(--back1), var(--back2)); color: rgba(255,255,255,.7); font-size: 1.6rem; }
+  .front { background: var(--card); transform: rotateY(180deg); font-size: clamp(1.6rem, 6vw, 2.6rem); }
+  .card.found .front { background: #fff8e6; outline: 3px solid var(--gold); }
+
+  .badges { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  .badge { background: var(--card); border-radius: 16px; padding: 16px; text-align: center; box-shadow: 0 3px 10px rgba(0,0,0,.06); }
+  .badge .ico { font-size: 2.6rem; }
+  .badge b { display: block; margin-top: 6px; }
+  .badge span { color: var(--soft); font-size: .85rem; }
+  .badge.locked .ico { filter: grayscale(1); opacity: .35; }
+  .badge.locked b { color: #b8afa5; }
+
+  .overlay { position: fixed; inset: 0; background: rgba(60,55,50,.45); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 10; }
+  .overlay.show { display: flex; }
+  .modal { background: var(--card); border-radius: 22px; padding: 26px; text-align: center; max-width: 380px; width: 100%; animation: pop .35s ease; }
+  @keyframes pop { from { transform: scale(.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .bigstars { font-size: 2.6rem; letter-spacing: 6px; margin: 8px 0; }
+  .newbadge { margin-top: 12px; padding: 12px; border-radius: 14px; background: #fff8e6; }
+  .confetti { position: fixed; top: -20px; font-size: 1.4rem; pointer-events: none; animation: fall linear forwards; z-index: 20; }
+  @keyframes fall { to { transform: translateY(110vh) rotate(360deg); } }
+
+  @media (max-width: 480px) { .levels { grid-template-columns: repeat(4, 1fr); } h1 { font-size: 1.8rem; } }
+
+  /* Sur un ordinateur : le jeu s'affiche dans un "téléphone" */
+  @media (min-width: 600px) {
+    body { align-items: center; padding: 24px; background: linear-gradient(160deg, #d9cfc4, #b9cdbf); }
+    .app {
+      max-width: 400px; height: min(840px, calc(100vh - 48px)); overflow-y: auto;
+      border: 12px solid #2f2f33; border-radius: 44px; padding-top: 34px;
+      background: linear-gradient(160deg, var(--bg1), var(--bg2));
+      box-shadow: 0 20px 50px rgba(0,0,0,.25); position: relative; scrollbar-width: none;
+    }
+    .app::-webkit-scrollbar { display: none; }
+    .app::before {
+      content: ""; position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+      width: 90px; height: 22px; border-radius: 999px; background: #2f2f33;
+    }
+    .levels { grid-template-columns: repeat(4, 1fr); }
+    h1 { font-size: 1.8rem; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Écran d'accueil -->
+  <section id="home" class="screen active">
+    <h1>🌸 Zen Memory 🌸</h1>
+    <p class="sub">Retrouve les paires, détends-toi et gagne des récompenses</p>
+    <div class="stats">
+      <div class="pill">⭐ <span id="totalStars">0</span> étoiles</div>
+      <div class="pill">🏆 <span id="totalBadges">0</span> récompenses</div>
+    </div>
+    <div class="levels" id="levels"></div>
+    <div class="row">
+      <button class="btn light" onclick="show('rewards')">🏆 Mes récompenses</button>
+      <button class="btn light" onclick="showHelp()">❓ Comment jouer</button>
+    </div>
+  </section>
+
+  <!-- Écran de jeu -->
+  <section id="game" class="screen">
+    <div class="topbar">
+      <button class="btn light" onclick="goHome()">← Menu</button>
+      <div class="pill">Niveau <span id="lvlNum">1</span></div>
+      <div class="pill">Coups : <span id="moves">0</span></div>
+    </div>
+    <div class="board" id="board"></div>
+  </section>
+
+  <!-- Écran des récompenses -->
+  <section id="rewards" class="screen">
+    <div class="topbar">
+      <button class="btn light" onclick="goHome()">← Menu</button>
+      <div class="pill">⭐ <span id="totalStars2">0</span> étoiles</div>
+    </div>
+    <h1 style="font-size:1.8rem">🏆 Mes récompenses</h1>
+    <p class="sub">Gagne des étoiles pour débloquer de nouvelles récompenses</p>
+    <div class="badges" id="badges"></div>
+  </section>
+</div>
+
+<!-- Fenêtre (victoire / aide) -->
+<div class="overlay" id="overlay"><div class="modal" id="modal"></div></div>
+
+<script>
+// ---------- Réglages du jeu ----------
+const SYMBOLS = ["🌸","🕯️","🧴","🌿","🍵","💆‍♀️","🛁","🌺","🍃","🌙","🐚","🍋","🧖‍♀️","🌼"];
+// Nombre de paires pour chaque niveau
+const LEVELS = [3, 4, 5, 6, 6, 8, 8, 10, 10, 12];
+// Récompenses : nombre d'étoiles à atteindre
+const REWARDS = [
+  { stars: 3,  ico: "🌸", name: "Fleur de lotus" },
+  { stars: 6,  ico: "🕯️", name: "Bougie parfumée" },
+  { stars: 10, ico: "🍵", name: "Thé détente" },
+  { stars: 14, ico: "🧴", name: "Huile de massage" },
+  { stars: 18, ico: "🛁", name: "Bain moussant" },
+  { stars: 22, ico: "💆‍♀️", name: "Massage royal" },
+  { stars: 26, ico: "🌿", name: "Maître zen" },
+  { stars: 30, ico: "👑", name: "Reine du spa" },
+];
+
+// ---------- Sauvegarde (reste dans le navigateur) ----------
+let save = { stars: {} }; // stars[niveau] = meilleur score (1 à 3)
+try { const s = JSON.parse(localStorage.getItem("zenMemory")); if (s && s.stars) save = s; } catch (e) {}
+function store() { try { localStorage.setItem("zenMemory", JSON.stringify(save)); } catch (e) {} }
+
+const totalStars = () => Object.values(save.stars).reduce((a, b) => a + b, 0);
+const unlockedBadges = (n = totalStars()) => REWARDS.filter(r => n >= r.stars);
+const isUnlocked = i => i === 0 || save.stars[i - 1] > 0;
+
+// ---------- Navigation ----------
+function show(id) {
+  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+  if (id === "home") renderHome();
+  if (id === "rewards") renderRewards();
+}
+function goHome() { closeModal(); show("home"); }
+
+function renderHome() {
+  document.getElementById("totalStars").textContent = totalStars();
+  document.getElementById("totalBadges").textContent = unlockedBadges().length;
+  const box = document.getElementById("levels");
+  box.innerHTML = "";
+  LEVELS.forEach((_, i) => {
+    const b = document.createElement("button");
+    const st = save.stars[i] || 0;
+    if (isUnlocked(i)) {
+      b.className = "lvl";
+      b.innerHTML = `${i + 1}<small>${"★".repeat(st)}${"☆".repeat(3 - st)}</small>`;
+      b.onclick = () => startLevel(i);
+    } else {
+      b.className = "lvl locked";
+      b.innerHTML = "🔒";
+    }
+    box.appendChild(b);
+  });
+}
+
+function renderRewards() {
+  const n = totalStars();
+  document.getElementById("totalStars2").textContent = n;
+  document.getElementById("badges").innerHTML = REWARDS.map(r => `
+    <div class="badge ${n >= r.stars ? "" : "locked"}">
+      <div class="ico">${r.ico}</div>
+      <b>${r.name}</b>
+      <span>${n >= r.stars ? "Débloquée !" : r.stars + " ⭐ nécessaires"}</span>
+    </div>`).join("");
+}
+
+// ---------- Partie ----------
+let level = 0, first = null, lock = false, moves = 0, found = 0;
+
+function startLevel(i) {
+  level = i; first = null; lock = false; moves = 0; found = 0;
+  const pairs = LEVELS[i];
+  const picks = shuffle([...SYMBOLS]).slice(0, pairs);
+  const deck = shuffle([...picks, ...picks]);
+  let cols = deck.length <= 6 ? 3 : deck.length <= 16 ? 4 : deck.length <= 20 ? 5 : 6;
+  cols = Math.min(cols, 4); // format téléphone : cartes plus grandes
+  const board = document.getElementById("board");
+  board.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+  board.style.maxWidth = cols * 110 + "px";
+  board.innerHTML = "";
+  deck.forEach(sym => {
+    const c = document.createElement("button");
+    c.className = "card";
+    c.dataset.sym = sym;
+    c.innerHTML = `<div class="inner"><div class="face back">✿</div><div class="face front">${sym}</div></div>`;
+    c.onclick = () => flip(c);
+    board.appendChild(c);
+  });
+  document.getElementById("lvlNum").textContent = i + 1;
+  document.getElementById("moves").textContent = 0;
+  show("game");
+}
+
+function flip(c) {
+  if (lock || c === first || c.classList.contains("found")) return;
+  c.classList.add("open");
+  if (!first) { first = c; return; }
+  moves++;
+  document.getElementById("moves").textContent = moves;
+  const second = c;
+  if (first.dataset.sym === second.dataset.sym) {
+    first.classList.add("found"); second.classList.add("found");
+    first = null; found++;
+    try { navigator.vibrate && navigator.vibrate(40); } catch (e) {} // petite vibration sur téléphone
+    if (found === LEVELS[level]) setTimeout(win, 600);
+  } else {
+    lock = true;
+    setTimeout(() => { first.classList.remove("open"); second.classList.remove("open"); first = null; lock = false; }, 800);
+  }
+}
+
+function win() {
+  const pairs = LEVELS[level];
+  const stars = moves <= Math.ceil(pairs * 1.5) ? 3 : moves <= pairs * 2.2 ? 2 : 1;
+  const before = unlockedBadges().length;
+  save.stars[level] = Math.max(save.stars[level] || 0, stars);
+  store();
+  const newOnes = unlockedBadges().slice(before);
+  const last = level === LEVELS.length - 1;
+
+  let html = `<h2>Bravo ! 🎉</h2>
+    <p>Niveau ${level + 1} terminé en ${moves} coups</p>
+    <div class="bigstars">${"⭐".repeat(stars)}${"☆".repeat(3 - stars)}</div>`;
+  newOnes.forEach(r => {
+    html += `<div class="newbadge">Nouvelle récompense !<br><span style="font-size:2.2rem">${r.ico}</span><br><b>${r.name}</b></div>`;
+  });
+  if (last) html += `<p>Tu as fini tous les niveaux ! Essaie d'avoir 3 étoiles partout 😉</p>`;
+  html += `<div class="row">
+      <button class="btn light" onclick="closeModal(); startLevel(${level})">↻ Rejouer</button>
+      ${last ? `<button class="btn" onclick="goHome()">Menu</button>`
+             : `<button class="btn" onclick="closeModal(); startLevel(${level + 1})">Niveau suivant →</button>`}
+    </div>`;
+  openModal(html);
+  confetti();
+}
+
+function showHelp() {
+  openModal(`<h2>Comment jouer ❓</h2>
+    <p style="text-align:left">1. Clique sur une carte pour la retourner.<br>
+    2. Clique sur une 2e carte.<br>
+    3. Si les deux images sont pareilles, tu gagnes la paire !<br>
+    4. Trouve toutes les paires pour finir le niveau.<br><br>
+    Moins tu fais de coups, plus tu gagnes d'étoiles ⭐.<br>
+    Les étoiles débloquent des récompenses 🏆 et les niveaux suivants.</p>
+    <div class="row"><button class="btn" onclick="closeModal()">C'est parti !</button></div>`);
+}
+
+// ---------- Petits outils ----------
+function openModal(html) { document.getElementById("modal").innerHTML = html; document.getElementById("overlay").classList.add("show"); }
+function closeModal() { document.getElementById("overlay").classList.remove("show"); }
+function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function confetti() {
+  const bits = ["🌸","⭐","🌿","✨","🌼"];
+  for (let i = 0; i < 30; i++) {
+    const s = document.createElement("div");
+    s.className = "confetti";
+    s.textContent = bits[i % bits.length];
+    s.style.left = Math.random() * 100 + "vw";
+    s.style.animationDuration = 2 + Math.random() * 2 + "s";
+    s.style.animationDelay = Math.random() * .5 + "s";
+    document.body.appendChild(s);
+    setTimeout(() => s.remove(), 5000);
+  }
+}
+
+renderHome();
+</script>
+</body>
+</html>
